@@ -1,5 +1,4 @@
 import Web3 from 'web3';
-import { AbiItem } from 'web3-utils';
 import { TotalPooledData } from '../interfaces/TotalPooledData';
 import { TokenBalances } from '../interfaces/TokenBalances';
 import { stETHAbi } from '../utils/stETHAbi';
@@ -27,7 +26,7 @@ class StETHContract {
         .getTotalPooledEther()
         .call();
       let totalShares = await this.contractInstance.methods
-        .getTotalShares()
+        .totalSupply()
         .call();
       totalPooledETH = this.convertWeiToEther(totalPooledETH);
       totalShares = this.convertWeiToEther(totalShares);
@@ -65,70 +64,50 @@ class StETHContract {
     }
 
     try {
-      let currentBlockNumber = await this.web3.eth.getBlockNumber();
+      let currentBlockNumber = BigInt(await this.web3.eth.getBlockNumber());
       const maxBlockNumber = currentBlockNumber;
 
-      // // Parallel execution of requests but this is breaking for now.
-      // const allTxPromises = [];
-      // while (currentBlockNumber > 0) {
-      //   allTxPromises.push(
-      //     this.contractInstance.getPastEvents('allEvents', {
-      //       filter: { from: address, to: address },
-      //       fromBlock: currentBlockNumber - 599,
-      //       toBlock: currentBlockNumber,
-      //     })
-      //   );
-      //   currentBlockNumber -= 600;
-      // }
-      // const results = await Promise.all(allTxPromises);
-      // const allEvents = results.flat();
-      // const lAddress = address.toLowerCase();
-      // const events = allEvents
-      //   .reverse()
-      //   .find(
-      //     (event) =>
-      //       event.returnValues.to.toLowerCase() === lAddress ||
-      //       event.returnValues.from.toLowerCase() === lAddress
-      //   );
-
-      // Sequential execution of fetching transactions
-
-      //Testing purposes for now. This should be configured 
-      //after figuring out how to switch this to a sync and crawl phase model.
-      let yearBlockNumber = 16083397;
       let allEvents = [];
-      const maxOfBlocksForRequests = 2000;
+      const maxOfBlocksForRequests = currentBlockNumber - BigInt(2000);
+      // while (currentBlockNumber > maxOfBlocksForRequests) {
+      //   const block = await this.web3.eth.getBlock(
+      //     currentBlockNumber.toString()
+      //   );
+      //   console.log(block.transactions);
+      // for (let tx in block.transactions) {
+      //   console.log();
+      // }
+      //   currentBlockNumber -= BigInt(1);
+      // }
       while (
-        maxBlockNumber - currentBlockNumber <= maxOfBlocksForRequests &&
-        currentBlockNumber >= yearBlockNumber
+        currentBlockNumber >= BigInt(0) &&
+        currentBlockNumber >= maxOfBlocksForRequests
       ) {
         const result = await this.contractInstance.getPastEvents('allEvents', {
-          filter: { from: address, to: address },
-          //This theoretically should be earliest but it's not a feasible call.
-          fromBlock: currentBlockNumber - BigInt(499),
-          toBlock: currentBlockNumber,
+          fromBlock: Number(currentBlockNumber) - 499,
+          toBlock: Number(currentBlockNumber),
         });
         currentBlockNumber -= BigInt(500);
         if (result && result.length > 0) {
-          allEvents.push(result);
+          allEvents.push(...result);
         }
       }
       const lAddress = address.toLowerCase();
       const events =
         allEvents
           .reverse()
+          .filter(
+            (event) =>
+              event.returnValues !== undefined &&
+              event.returnValues.from !== undefined &&
+              event.returnValues.to !== undefined
+          )
           .find(
             (event) =>
               event.returnValues.to.toLowerCase() === lAddress ||
               event.returnValues.from.toLowerCase() === lAddress
           ) || [];
 
-      // Fetch all events, throws limit error for result > 10000
-      // const events = await this.contractInstance.getPastEvents('allEvents', {
-      //   filter: { from: address, to: address },
-      //   // fromBlock: 0,
-      //   // toBlock: currentBlockNumber,
-      // });
       return events;
     } catch (error: any) {
       throw new Error(
