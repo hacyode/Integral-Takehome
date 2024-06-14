@@ -36,7 +36,7 @@ class StETHContract {
         .getTotalPooledEther()
         .call();
       let totalShares = await this.contractInstance.methods
-        .totalSupply()
+        .getTotalShares()
         .call();
 
       // convert the wei amount to ether

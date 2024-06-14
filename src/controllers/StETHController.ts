@@ -38,6 +38,8 @@ class StETHController {
       const transactions = await this.stETHContract.getAllTransactions(address);
       res.json(transactions);
     } catch (error) {
+      console.log(error);
+
       res.status(500).json({ error: 'Internal server error ' });
     }
   };

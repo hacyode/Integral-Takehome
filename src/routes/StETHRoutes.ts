@@ -3,7 +3,6 @@ import Web3 from 'web3';
 import StETHController from '../controllers/StETHController';
 import dotenv from 'dotenv';
 
-
 dotenv.config();
 
 function getEnvVar(name: string): string {
@@ -21,7 +20,10 @@ const stETHController = new StETHController(web3, STETH_CONTRACT_ADDRESS);
 
 const router = Router();
 
-router.get('/totalPooledETHAndShares', stETHController.getTotalPooledETHAndShares);
+router.get(
+  '/totalPooledETHAndShares',
+  stETHController.getTotalPooledETHAndShares
+);
 router.get('/mostRecentDepositor', stETHController.getMostRecentDepositor);
 router.get('/transactions/:address', stETHController.getAllTransactions);
 // router.get('/transfers/:address', stETHController.getStETHTransfers);
