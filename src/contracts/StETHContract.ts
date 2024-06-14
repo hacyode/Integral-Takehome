@@ -121,13 +121,10 @@ class StETHContract {
           .filter(
             (event) =>
               event.returnValues !== undefined &&
-              event.returnValues.from !== undefined &&
-              event.returnValues.to !== undefined
-          )
-          .filter(
-            (event) =>
-              event.returnValues.to.toLowerCase() === lAddress ||
-              event.returnValues.from.toLowerCase() === lAddress
+              ((event.returnValues.from !== undefined &&
+                event.returnValues.to.toLowerCase() === lAddress) ||
+                (event.returnValues.from !== undefined &&
+                  event.returnValues.from.toLowerCase() === lAddress))
           ) || [];
 
       return events;
