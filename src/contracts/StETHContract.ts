@@ -6,11 +6,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// StETHContract class handles interactions with the stETH smart contract
 class StETHContract {
   private web3: Web3;
   private contractAddress: string;
   private contractInstance: any;
 
+  /**
+   * Create an instance of StETHContract.
+   * @param {Web3} web3 - An instance of Web3 created using api link.
+   * @param {string} contractAddress - The address of the stETH contract.
+   */
   constructor(web3: Web3, contractAddress: string) {
     this.web3 = web3;
     this.contractAddress = contractAddress;
@@ -20,6 +26,10 @@ class StETHContract {
     );
   }
 
+  /**
+   * Get the total pooled ETH and total shares.
+   * @returns {Promise<TotalPooledData>} - An object containing total pooled ETH and total shares.
+   */
   async getTotalPooledETHAndShares(): Promise<TotalPooledData> {
     try {
       let totalPooledETH = await this.contractInstance.methods
@@ -28,8 +38,12 @@ class StETHContract {
       let totalShares = await this.contractInstance.methods
         .totalSupply()
         .call();
+
+      // convert the wei amount to ether
       totalPooledETH = this.convertWeiToEther(totalPooledETH);
       totalShares = this.convertWeiToEther(totalShares);
+
+      // crete and return an object with combined result
       return { totalPooledETH, totalShares };
     } catch (error: any) {
       throw new Error(
@@ -38,16 +52,19 @@ class StETHContract {
     }
   }
 
+  /**
+   * Get the most recent depositor's address.
+   * @returns {Promise<string>} - The address of the most recent depositor.
+   */
   async getMostRecentDepositor(): Promise<string> {
     try {
-      const count = await this.web3.eth.getTransactionCount(
-        this.contractAddress
-      );
+      // get all transfer events destined to the contractAddress from the first block to lastest
       const events = await this.contractInstance.getPastEvents('Transfer', {
         filter: { to: this.contractAddress },
         fromBlock: 0,
         toBlock: 'latest',
       });
+      // if transfer not empty then return the from address from the most-recet transfer object
       return events.length > 0
         ? events[events.length - 1].returnValues.from
         : '';
@@ -58,41 +75,46 @@ class StETHContract {
     }
   }
 
+  /**
+   * Get all transactions for a specific address.
+   * @param {string} address - The address to filter the transactions for.
+   * @returns {Promise<any[]>} - An array of transactions.
+   * @throws Will throw an error if the address is invalid or fetching transactions fails.
+   */
   async getAllTransactions(address: string): Promise<any[]> {
     if (!Web3.utils.isAddress(address)) {
       throw new Error('Invalid address provided');
     }
 
     try {
+      // get the current block number of the contract
       let currentBlockNumber = BigInt(await this.web3.eth.getBlockNumber());
-      const maxBlockNumber = currentBlockNumber;
 
+      // container to store result from allEvents calls
       let allEvents = [];
+      // threshold to define the oldest block to be used to fetch events
       const maxOfBlocksForRequests = currentBlockNumber - BigInt(2000);
-      // while (currentBlockNumber > maxOfBlocksForRequests) {
-      //   const block = await this.web3.eth.getBlock(
-      //     currentBlockNumber.toString()
-      //   );
-      //   console.log(block.transactions);
-      // for (let tx in block.transactions) {
-      //   console.log();
-      // }
-      //   currentBlockNumber -= BigInt(1);
-      // }
+      // fetch events as long as currentBlockNumber is greater than currentBlockNumber - 2000
+      // mean only fetch events between current block number and the past 2000 blocks
       while (
         currentBlockNumber >= BigInt(0) &&
         currentBlockNumber >= maxOfBlocksForRequests
       ) {
+        // get events for the given block from and to range
         const result = await this.contractInstance.getPastEvents('allEvents', {
           fromBlock: Number(currentBlockNumber) - 499,
           toBlock: Number(currentBlockNumber),
         });
+        // reduce the currentBlockNumber by 500 to fetch the events of previous 500 blocks
         currentBlockNumber -= BigInt(500);
+        // store the transaction events into allEvents, if exists
         if (result && result.length > 0) {
           allEvents.push(...result);
         }
       }
+      // convert address to lower case for case insensitive comparison
       const lAddress = address.toLowerCase();
+      // grab all events having from and to addresses, matching the given address
       const events =
         allEvents
           .reverse()
@@ -102,7 +124,7 @@ class StETHContract {
               event.returnValues.from !== undefined &&
               event.returnValues.to !== undefined
           )
-          .find(
+          .filter(
             (event) =>
               event.returnValues.to.toLowerCase() === lAddress ||
               event.returnValues.from.toLowerCase() === lAddress
